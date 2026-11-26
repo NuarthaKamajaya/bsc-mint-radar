@@ -64,19 +64,39 @@ No secrets are read or stored — the seller address is public, and there are no
 
 ## Deploy
 
-### Deno Deploy (target)
-The code is plain ESM using only `fetch` + npm packages — Deno-compatible. `npm:` specifiers
-resolve via `package.json`, so:
+### Cloudflare Workers (branch `workers` — primary target)
+
+`src/worker.mjs` is a Hono app with the x402 v2 payment gate (`@x402/hono` +
+`@x402/evm` ExactEvmScheme, Circle Facilitator Service). Same routes and price
+as the Express version.
 
 ```bash
-deno run --allow-net --allow-read --allow-env --env-file=.env npm:bsc-mint-radar/src/server.mjs
-# or: add deno.json {"nodeModulesDir":"auto","tasks":{"start":"deno run -A npm:./src/server.mjs"}}
+# 1. Auth (one-time; interactive login OR CI token)
+npx wrangler login
+#    or: CLOUDFLARE_API_TOKEN=<token with Workers Scripts:Edit> in CI
+
+# 2. Secrets (NEVER in the repo / .env.example)
+npx wrangler secret put CIRCLE_API_KEY   # Circle Facilitator verify/settle auth
+
+# 3. Deploy (config in wrangler.jsonc: name bsc-mint-radar, main src/worker.mjs)
+npx wrangler deploy
 ```
 
-Caveat: `@circle-fin/x402-batching` uses Node-only internals in some paths. If the gateway
-middleware misbehaves under Deno, deploy the same repo on Fly.io instead:
+Differences vs. the Express version (main):
 
-### Fly.io (fallback)
+| | Express (`main`) | Workers (`workers`) |
+|---|---|---|
+| Runtime | Node 20+, Express 5 | V8 isolate, Hono fetch-handler |
+| x402 SDK | `@circle-fin/x402-batching` Gateway middleware | `@x402/hono` + `@x402/evm` (x402 v2) |
+| Facilitator | Circle Gateway (`gateway-api.circle.com`) | Circle Facilitator Service (`api.circle.com/v1/facilitator/x402`, needs `CIRCLE_API_KEY`) |
+| Config | `src/config.json` + env | baked into `src/worker.mjs` + `wrangler.jsonc` vars/secrets |
+| Cache | in-process Map, 10 min | module-level Map, 10 min (resets on isolate restart — still a warm cache) |
+| Tests | `node --test` (13 tests) | `npm run test:workers` — vitest, 11 tests via `app.request()` |
+
+Note: `.env.example` stays secret-free; all Workers secrets go through
+`wrangler secret put` only.
+
+### Fly.io (Express fallback, `main` branch only)
 ```bash
 # minimal fly.toml + Dockerfile:
 #   FROM node:22-alpine; WORKDIR /app; COPY . .; RUN npm ci --omit=dev; CMD ["node","src/server.mjs"]

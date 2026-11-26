@@ -1,0 +1,22 @@
+{
+  // Cloudflare Workers config — BSC Mint Radar (x402 paid API, branch `workers`).
+  // Deploy: npx wrangler deploy. No secrets in this file.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bsc-mint-radar",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-11-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    // Public, non-secret values (mirror src/config.json on main).
+    "FACILITATOR_URL": "https://api.circle.com/v1/facilitator/x402"
+    // SELLER_ADDRESS is baked into src/worker.mjs; override via
+    // `npx wrangler secret put`-style env only if it ever needs to change
+    // (it is a public payout address, not a secret).
+  }
+  // Circle Facilitator Service requires an API key for verify/settle.
+  // Set it WITHOUT touching this repo:
+  //   npx wrangler secret put CIRCLE_API_KEY
+  // and send it as `Authorization: Bearer $CIRCLE_API_KEY` — see README
+  // (the HTTPFacilitatorClient from @x402/core/server must be configured with
+  // the key; wire it in createWorkerApp deps before enabling production deploy).
+}
