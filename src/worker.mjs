@@ -252,13 +252,29 @@ const authFor = (apiKey) => () => ({
 const withPayToInBody = async (response, sellerAddress) => {
   if (!response || response.status !== 402) return response;
   try {
+    // 1) Header PAYMENT-REQUIRED (base64url JSON, authoritative per x402 v2)
+    const headers = new Headers(response.headers);
+    const hdr = headers.get('payment-required');
+    if (hdr) {
+      try {
+        const decoded = JSON.parse(atob(hdr.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(-hdr.length % 4 || 0)));
+        let changed = false;
+        for (const a of decoded?.accepts ?? []) {
+          if (!a.payTo) { a.payTo = sellerAddress; changed = true; }
+        }
+        if (changed) {
+          const b64 = btoa(JSON.stringify(decoded)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          headers.set('payment-required', b64);
+        }
+      } catch { /* header stays as-is */ }
+    }
+    // 2) JSON body mirror
     const payload = await response.json();
     let changed = false;
     for (const a of payload?.accepts ?? []) {
       if (!a.payTo) { a.payTo = sellerAddress; changed = true; }
     }
     if (!changed) return response;
-    const headers = new Headers(response.headers);
     headers.delete('content-length');
     return new Response(JSON.stringify(payload), { status: 402, headers });
   } catch {
