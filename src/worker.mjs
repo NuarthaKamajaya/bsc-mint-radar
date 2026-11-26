@@ -276,7 +276,6 @@ const withPayToInBody = async (response, sellerAddress) => {
     for (const a of payload?.accepts ?? []) {
       if (!a.payTo) { a.payTo = sellerAddress; changed = true; }
     }
-    if (!changed) return response;
     headers.delete('content-length');
     return new Response(JSON.stringify(payload), { status: 402, headers });
   } catch {
