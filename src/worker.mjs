@@ -196,22 +196,20 @@ export function createWorkerApp(config = {}, deps = {}) {
       if (v && (!deps.bypassValue || v === deps.bypassValue)) return next();
     }
     await ensureInit();
-    const resp = await paymentMw(c, next);
+    await paymentMw(c, next);
     // Directory crawlers (PayAPI/agent402/minia2a) read payTo from the JSON
-    // body, but the SDK's 402 payload omits it — inject it into the body copy.
-    if (resp && resp.status === 402) {
+    // body, but the SDK's 402 payload omits it — rewrite c.res after the gate.
+    if (c.res && c.res.status === 402) {
       try {
-        const clone = new Response(await resp.clone().text(), resp);
-        const payload = await clone.json();
+        const payload = await c.res.json();
         for (const a of payload?.accepts ?? []) {
           if (!a.payTo) a.payTo = cfg.sellerAddress;
         }
-        return c.json(payload, 402, Object.fromEntries(resp.headers));
-      } catch {
-        return resp;
-      }
+        const headers = new Headers(c.res.headers);
+        headers.delete('content-length');
+        c.res = new Response(JSON.stringify(payload), { status: 402, headers });
+      } catch { /* leave the SDK response untouched */ }
     }
-    return resp;
   });
 
   const inspectOne = async (address) => {
