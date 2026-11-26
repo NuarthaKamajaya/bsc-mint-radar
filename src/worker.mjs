@@ -263,8 +263,10 @@ const withPayToInBody = async (response, sellerAddress) => {
           if (!a.payTo) { a.payTo = sellerAddress; changed = true; }
         }
         if (changed) {
-          const b64 = btoa(JSON.stringify(decoded)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-          headers.set('payment-required', b64);
+          const bytes = new TextEncoder().encode(JSON.stringify(decoded));
+          let bin = '';
+          for (const b of bytes) bin += String.fromCharCode(b);
+          headers.set('payment-required', btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''));
         }
       } catch { /* header stays as-is */ }
     }
