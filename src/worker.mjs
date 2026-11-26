@@ -257,7 +257,7 @@ const withPayToInBody = async (response, sellerAddress) => {
     const hdr = headers.get('payment-required');
     if (hdr) {
       try {
-        const decoded = JSON.parse(atob(hdr.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(-hdr.length % 4 || 0)));
+        const decoded = JSON.parse(atob(hdr.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (hdr.length % 4)) % 4)));
         let changed = false;
         for (const a of decoded?.accepts ?? []) {
           if (!a.payTo) { a.payTo = sellerAddress; changed = true; }
