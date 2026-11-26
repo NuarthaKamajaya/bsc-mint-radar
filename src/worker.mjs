@@ -196,20 +196,7 @@ export function createWorkerApp(config = {}, deps = {}) {
       if (v && (!deps.bypassValue || v === deps.bypassValue)) return next();
     }
     await ensureInit();
-    await paymentMw(c, next);
-    // Directory crawlers (PayAPI/agent402/minia2a) read payTo from the JSON
-    // body, but the SDK's 402 payload omits it — rewrite c.res after the gate.
-    if (c.res && c.res.status === 402) {
-      try {
-        const payload = await c.res.json();
-        for (const a of payload?.accepts ?? []) {
-          if (!a.payTo) a.payTo = cfg.sellerAddress;
-        }
-        const headers = new Headers(c.res.headers);
-        headers.delete('content-length');
-        c.res = new Response(JSON.stringify(payload), { status: 402, headers });
-      } catch { /* leave the SDK response untouched */ }
-    }
+    return paymentMw(c, next);
   });
 
   const inspectOne = async (address) => {
@@ -260,8 +247,27 @@ const authFor = (apiKey) => () => ({
   settle: { Authorization: `Bearer ${apiKey}` },
 });
 
+// Directory crawlers (PayAPI/agent402/minia2a) read payTo from the 402 JSON
+// body, but the SDK payload omits it — rewrite the final 402 response here.
+const withPayToInBody = async (response, sellerAddress) => {
+  if (!response || response.status !== 402) return response;
+  try {
+    const payload = await response.json();
+    let changed = false;
+    for (const a of payload?.accepts ?? []) {
+      if (!a.payTo) { a.payTo = sellerAddress; changed = true; }
+    }
+    if (!changed) return response;
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+    return new Response(JSON.stringify(payload), { status: 402, headers });
+  } catch {
+    return response;
+  }
+};
+
 export default {
-  fetch(request, env, ctx) {
+  async fetch(request, env, ctx) {
     const app = createWorkerApp({
       sellerAddress: env.SELLER_ADDRESS || undefined,
       facilitatorUrl: env.FACILITATOR_URL || undefined,
@@ -269,6 +275,7 @@ export default {
     }, {
       facilitatorAuth: env.CIRCLE_API_KEY ? authFor(env.CIRCLE_API_KEY) : undefined,
     });
-    return app.fetch(request, env, ctx);
+    const seller = env.SELLER_ADDRESS || '0xAe9ad223a1D4e9ADecFd3BD8363f1b8Ea4e0d512';
+    return withPayToInBody(await app.fetch(request, env, ctx), seller);
   },
 };
