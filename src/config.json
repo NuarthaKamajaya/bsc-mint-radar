@@ -1,0 +1,16 @@
+{
+  "port": 3000,
+  "chainId": 56,
+  "network": "eip155:8453",
+  "sellerAddress": "0xAe9ad223a1D4e9ADecFd3BD8363f1b8Ea4e0d512",
+  "price": "$0.001",
+  "rpcUrls": [
+    "https://bsc-dataseed.binance.org",
+    "https://bsc-rpc.publicnode.com"
+  ],
+  "sourcifyUrl": "https://sourcify.dev/server/v2/contract",
+  "cacheTtlMs": 600000,
+  "batchMax": 10,
+  "batchConcurrency": 5,
+  "facilitatorUrl": "https://gateway-api.circle.com"
+}

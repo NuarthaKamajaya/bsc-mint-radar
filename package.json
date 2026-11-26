@@ -1,0 +1,22 @@
+{
+  "name": "bsc-mint-radar",
+  "version": "1.0.0",
+  "description": "BSC NFT contract mint radar — x402 USDC paid API on Base (Circle Agent Marketplace ready)",
+  "type": "module",
+  "main": "src/server.mjs",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@circle-fin/x402-batching": "^4.0.0",
+    "@x402/core": "^2.32.0",
+    "@x402/evm": "^2.32.0",
+    "express": "^5.3.0",
+    "viem": "^2.52.0"
+  }
+}
