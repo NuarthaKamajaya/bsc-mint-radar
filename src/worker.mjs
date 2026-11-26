@@ -122,6 +122,41 @@ export function createWorkerApp(config = {}, deps = {}) {
 
   app.get('/openapi.json', (c) => c.json(buildOpenApi(cfg)));
 
+  // x402 discovery manifest (agent402 / directories crawler)
+  app.get('/.well-known/x402', (c) => c.json({
+    x402Version: 2,
+    resources: [
+      {
+        resource: `${c.env?.PUBLIC_ORIGIN ?? 'https://bsc-mint-radar.kamajaya-agents.workers.dev'}/v1/inspect`,
+        method: 'GET',
+        description: 'BSC Mint Radar — live BSC NFT contract inspection: name/symbol, supply, mint price, free mint slots, Sourcify match, safety flags',
+        accepts: [{
+          scheme: 'exact',
+          network: 'eip155:8453',
+          amount: '1000',
+          asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          payTo: cfg.sellerAddress,
+          maxTimeoutSeconds: 300,
+          extra: { name: 'USD Coin', version: '2' },
+        }],
+      },
+      {
+        resource: `${c.env?.PUBLIC_ORIGIN ?? 'https://bsc-mint-radar.kamajaya-agents.workers.dev'}/v1/batch`,
+        method: 'GET',
+        description: 'BSC Mint Radar — batch NFT contract inspection (up to 10 addresses in one call)',
+        accepts: [{
+          scheme: 'exact',
+          network: 'eip155:8453',
+          amount: '1000',
+          asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          payTo: cfg.sellerAddress,
+          maxTimeoutSeconds: 300,
+          extra: { name: 'USD Coin', version: '2' },
+        }],
+      },
+    ],
+  }));
+
   // ---- Paid routes ----
   // Validation runs BEFORE the payment gate: unpaid bad input gets an honest
   // 400, not a 402 paywall (same behavior as the Express version).
@@ -129,14 +164,19 @@ export function createWorkerApp(config = {}, deps = {}) {
     const { path } = c.req;
     if (path === '/v1/inspect') {
       const address = c.req.query('address');
-      if (!isValidAddress(address)) {
+      // Bare unpaid probe (no param) must still return 402 so directory
+      // crawlers can read our price/chain (agent402/PayAPI/minia2a rule).
+      // Only a present-but-invalid address gets an honest 400.
+      if (address === undefined || address.trim() === '') {
+        // fall through to the payment gate
+      } else if (!isValidAddress(address)) {
         return c.json({ error: 'invalid_address', message: 'Provide ?address=0x… (40-hex EVM address)' }, 400);
       }
     } else if (path === '/v1/batch') {
       const raw = c.req.query('addresses');
       if (typeof raw !== 'string' || raw.trim() === '') {
-        return c.json({ error: 'missing_addresses', message: 'Provide ?addresses=0x…,0x… (max 10)' }, 400);
-      }
+        // bare unpaid probe → let the payment gate answer 402
+      } else {
       const addresses = raw.split(',').map((s) => s.trim());
       if (addresses.length > cfg.batchMax) {
         return c.json({ error: 'too_many_addresses', message: `Maximum ${cfg.batchMax} addresses per batch` }, 400);
@@ -145,6 +185,7 @@ export function createWorkerApp(config = {}, deps = {}) {
         if (!isValidAddress(a)) {
           return c.json({ error: 'invalid_address', message: `Not a valid EVM address: ${a}` }, 400);
         }
+      }
       }
     } else {
       return c.json({ error: 'not_found' }, 404);

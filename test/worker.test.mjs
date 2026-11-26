@@ -90,10 +90,14 @@ describe('worker: validation before payment gate', () => {
     expect((await res.json()).error).toBe('too_many_addresses');
   });
 
-  it('unpaid /v1/batch missing addresses → 400', async () => {
+  it('unpaid /v1/batch missing addresses → 402 (bare probe must expose price)', async () => {
     const res = await makeApp().request('/v1/batch');
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe('missing_addresses');
+    expect(res.status).toBe(402);
+  });
+
+  it('unpaid /v1/inspect missing address → 402 (bare probe must expose price)', async () => {
+    const res = await makeApp().request('/v1/inspect');
+    expect(res.status).toBe(402);
   });
 });
 
