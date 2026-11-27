@@ -42,6 +42,34 @@ export const workerConfig = {
  * @param {object} [deps] injectable for tests: rpcCall, fetchImpl, facilitator,
  *   bypassHeader/bypassValue, syncFacilitatorOnStart
  */
+// Custom facilitator — plain fetch (HTTPFacilitatorClient 525 di workerd, plain fetch OK)
+function plainFacilitator(baseUrl) {
+  const post = async (path, payload) => {
+    const r = await fetch(baseUrl + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(25000),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`facilitator ${path} failed (${r.status})`);
+    return data;
+  };
+  return {
+    async getSupported() {
+      const r = await fetch(baseUrl + '/supported', { signal: AbortSignal.timeout(15000) });
+      if (!r.ok) throw new Error(`facilitator supported failed (${r.status})`);
+      return r.json();
+    },
+    async verify(paymentPayload, paymentRequirements) {
+      return post('/verify', { x402Version: paymentPayload.x402Version, paymentPayload, paymentRequirements });
+    },
+    async settle(paymentPayload, paymentRequirements) {
+      return post('/settle', { x402Version: paymentPayload.x402Version, paymentPayload, paymentRequirements });
+    },
+  };
+}
+
 export function createWorkerApp(config = {}, deps = {}) {
   const cfg = { ...workerConfig, ...config };
   const rpcCall = deps.rpcCall ?? createRpcCaller(cfg.rpcUrls);
@@ -53,10 +81,7 @@ export function createWorkerApp(config = {}, deps = {}) {
     inspect: (address, d) => inspectContract(address, d),
   });
 
-  const facilitator = deps.facilitator ?? new HTTPFacilitatorClient({
-    url: cfg.facilitatorUrl,
-    ...(deps.facilitatorAuth ? { createAuthHeaders: deps.facilitatorAuth } : {}),
-  });
+  const facilitator = deps.facilitator ?? plainFacilitator(cfg.facilitatorUrl);
   const resourceServer = new x402ResourceServer(facilitator)
     .register(cfg.network, new ExactEvmScheme());
   // Facilitator /supported sync runs lazily on first paid request (Workers has
