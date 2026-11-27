@@ -8,7 +8,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     // Public, non-secret values (mirror src/config.json on main).
-    "FACILITATOR_URL": "https://api.circle.com/v1/facilitator/x402"
+    "FACILITATOR_URL": "https://facilitator.payai.network"
     // SELLER_ADDRESS is baked into src/worker.mjs; override via
     // `npx wrangler secret put`-style env only if it ever needs to change
     // (it is a public payout address, not a secret).

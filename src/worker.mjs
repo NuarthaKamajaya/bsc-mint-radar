@@ -33,7 +33,7 @@ export const workerConfig = {
   cacheTtlMs: 600000, // 10 minutes
   batchMax: 10,
   batchConcurrency: 5,
-  facilitatorUrl: 'https://api.circle.com/v1/facilitator/x402',
+  facilitatorUrl: 'https://facilitator.payai.network',
 };
 
 /**
